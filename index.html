@@ -58,6 +58,48 @@
         </label>
       </section>
 
+      <section class="controls key-controls">
+        <label class="control">
+          <span>Key mode</span>
+          <select id="keyMode">
+            <option value="auto" selected>Auto detect</option>
+            <option value="manual">Manual</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+
+        <label class="control">
+          <span>Root</span>
+          <select id="keyRoot">
+            <option value="0">C</option>
+            <option value="1">C# / Db</option>
+            <option value="2">D</option>
+            <option value="3">D# / Eb</option>
+            <option value="4">E</option>
+            <option value="5">F</option>
+            <option value="6">F# / Gb</option>
+            <option value="7">G</option>
+            <option value="8">G# / Ab</option>
+            <option value="9">A</option>
+            <option value="10">A# / Bb</option>
+            <option value="11">B</option>
+          </select>
+        </label>
+
+        <label class="control">
+          <span>Scale</span>
+          <select id="keyScale">
+            <option value="major">Major</option>
+            <option value="minor" selected>Minor</option>
+          </select>
+        </label>
+
+        <div class="control key-readout">
+          <span>Detected key</span>
+          <div id="detectedKeyText" class="key-text">None yet</div>
+        </div>
+      </section>
+
       <section class="meter-wrap">
         <canvas id="waveCanvas" width="1200" height="260"></canvas>
         <div class="status-row">
@@ -78,7 +120,7 @@
       </section>
 
       <p class="footnote">
-        Best results: clear humming, one main note at a time, quiet room. Slides are fine — this version tries to tame them.
+        Best results: clear humming, one main note at a time, quiet room. Slides are fine — key-aware cleanup helps tame them.
       </p>
     </main>
   </div>
