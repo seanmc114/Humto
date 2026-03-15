@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  />
+  <title>Hum → Bass</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://unpkg.com/tone@15.5.0/build/Tone.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="hero">
+      <div class="pill">Riff capture toy</div>
+      <h1>Hum → Bass</h1>
+      <p class="subtitle">
+        Hum a riff. Clean it up if you like. Hear it back as bass. Export it.
+      </p>
+    </header>
+
+    <main class="card">
+      <section class="top-actions">
+        <button id="recordBtn" class="btn btn-record">🎙 Record</button>
+        <button id="stopBtn" class="btn" disabled>■ Stop</button>
+        <button id="playBtn" class="btn" disabled>▶ Play</button>
+        <button id="loopBtn" class="btn" disabled>🔁 Loop Off</button>
+      </section>
+
+      <section class="controls">
+        <label class="control">
+          <span>Sound</span>
+          <select id="soundSelect">
+            <option value="warm">Warm Bass</option>
+            <option value="picked">Picked Bass</option>
+            <option value="synth">Synth Bass</option>
+          </select>
+        </label>
+
+        <label class="control control-toggle">
+          <span>Correct pitch</span>
+          <input type="checkbox" id="snapToggle" checked />
+        </label>
+
+        <label class="control control-toggle">
+          <span>Tighten rhythm</span>
+          <input type="checkbox" id="tightToggle" checked />
+        </label>
+
+        <label class="control">
+          <span>Octave</span>
+          <select id="octaveShift">
+            <option value="-12">Down 1</option>
+            <option value="0" selected>Original</option>
+            <option value="12">Up 1</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="meter-wrap">
+        <canvas id="waveCanvas" width="1200" height="260"></canvas>
+        <div class="status-row">
+          <div id="status">Ready.</div>
+          <div id="meta">No riff captured yet.</div>
+        </div>
+      </section>
+
+      <section class="notes-panel">
+        <h2>Detected riff</h2>
+        <div id="noteList" class="note-list">Nothing yet.</div>
+      </section>
+
+      <section class="export-panel">
+        <button id="midiBtn" class="btn" disabled>Export MIDI</button>
+        <button id="wavBtn" class="btn" disabled>Export WAV</button>
+        <button id="jsonBtn" class="btn" disabled>Save Riff Data</button>
+      </section>
+
+      <p class="footnote">
+        Best results: clear humming, one main note at a time, quiet room. Slides are fine — this version tries to tame them.
+      </p>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
