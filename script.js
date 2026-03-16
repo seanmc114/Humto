@@ -11,6 +11,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const snapToggle = document.getElementById("snapToggle");
   const tightToggle = document.getElementById("tightToggle");
   const octaveShift = document.getElementById("octaveShift");
+  const jimToggle = document.getElementById("jimToggle");
 
   const keyMode = document.getElementById("keyMode");
   const keyRoot = document.getElementById("keyRoot");
@@ -42,6 +43,7 @@ window.addEventListener("DOMContentLoaded", () => {
   let liveWave = new Float32Array(2048);
   let detectedKey = null;
   let loopTimeout = null;
+  let transportItems = [];
 
   function setStatus(text) {
     statusEl.textContent = text;
@@ -131,7 +133,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function autoCorrelate(buffer, sampleRate) {
     const level = rms(buffer);
-    if (level < 0.015) return null;
+    const minLevel = jimToggle.checked ? 0.02 : 0.015;
+    if (level < minLevel) return null;
 
     let bestOffset = -1;
     let bestCorrelation = 0;
@@ -154,7 +157,8 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    if (bestCorrelation > 0.87 && bestOffset > 0) {
+    const minCorrelation = jimToggle.checked ? 0.9 : 0.87;
+    if (bestCorrelation > minCorrelation && bestOffset > 0) {
       return sampleRate / bestOffset;
     }
 
@@ -164,10 +168,10 @@ window.addEventListener("DOMContentLoaded", () => {
   function drawWave() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.strokeStyle = "rgba(91,140,255,0.15)";
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
     ctx.lineWidth = 1;
     for (let i = 1; i <= 3; i++) {
       const y = (canvas.height / 4) * i;
@@ -177,7 +181,7 @@ window.addEventListener("DOMContentLoaded", () => {
       ctx.stroke();
     }
 
-    ctx.strokeStyle = "#5b8cff";
+    ctx.strokeStyle = "#60a5fa";
     ctx.lineWidth = 2.6;
     ctx.beginPath();
 
@@ -323,9 +327,11 @@ window.addEventListener("DOMContentLoaded", () => {
     });
 
     const smoothed = [];
+    const smoothing = jimToggle.checked ? 4 : 2;
+
     for (let i = 0; i < voiced.length; i++) {
       const slice = voiced
-        .slice(Math.max(0, i - 2), Math.min(voiced.length, i + 3))
+        .slice(Math.max(0, i - smoothing), Math.min(voiced.length, i + smoothing + 1))
         .filter(v => v.voiced);
 
       smoothed.push({
@@ -347,7 +353,7 @@ window.addEventListener("DOMContentLoaded", () => {
     for (const frame of smoothed) {
       if (!frame.voiced || frame.midiFloat == null) {
         silenceFrames++;
-        if (current && silenceFrames >= 2) {
+        if (current && silenceFrames >= (jimToggle.checked ? 3 : 2)) {
           current.end = frame.time;
           grouped.push(current);
           current = null;
@@ -376,7 +382,7 @@ window.addEventListener("DOMContentLoaded", () => {
       }
 
       const currentMedian = median(current.values);
-      const tolerance = snapToggle.checked ? 1.2 : 1.8;
+      const tolerance = jimToggle.checked ? 2.0 : (snapToggle.checked ? 1.2 : 1.8);
 
       if (Math.abs(midiValue - currentMedian) <= tolerance) {
         current.end = frame.time + 0.06;
@@ -404,16 +410,16 @@ window.addEventListener("DOMContentLoaded", () => {
 
         return {
           start: group.start,
-          duration: Math.max(0.08, group.end - group.start),
+          duration: Math.max(jimToggle.checked ? 0.12 : 0.08, group.end - group.start),
           midi: clampBassRange(finalMidi)
         };
       })
-      .filter(note => note.duration >= 0.1);
+      .filter(note => note.duration >= (jimToggle.checked ? 0.12 : 0.1));
 
     if (!cleaned.length) return [];
 
     if (tightToggle.checked) {
-      const shortest = Math.max(0.12, Math.min(...cleaned.map(n => n.duration)));
+      const shortest = Math.max(jimToggle.checked ? 0.14 : 0.12, Math.min(...cleaned.map(n => n.duration)));
       const grid = shortest < 0.18 ? 0.125 : 0.25;
 
       cleaned = cleaned.map(note => {
@@ -449,7 +455,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   async function startRecording() {
     try {
-      setStatus("Starting mic…");
+      setStatus(jimToggle.checked ? "Starting mic… Jim Mode armed 🎧" : "Starting mic…");
       ensureAudioContext();
 
       if (audioContext.state === "suspended") {
@@ -473,10 +479,21 @@ window.addEventListener("DOMContentLoaded", () => {
 
       analyser = audioContext.createAnalyser();
       analyser.fftSize = 2048;
-      analyser.smoothingTimeConstant = 0.82;
+      analyser.smoothingTimeConstant = jimToggle.checked ? 0.9 : 0.82;
 
       sourceNode = audioContext.createMediaStreamSource(mediaStream);
-      sourceNode.connect(analyser);
+
+      const highpass = audioContext.createBiquadFilter();
+      highpass.type = "highpass";
+      highpass.frequency.value = jimToggle.checked ? 70 : 50;
+
+      const lowpass = audioContext.createBiquadFilter();
+      lowpass.type = "lowpass";
+      lowpass.frequency.value = jimToggle.checked ? 1200 : 1500;
+
+      sourceNode.connect(highpass);
+      highpass.connect(lowpass);
+      lowpass.connect(analyser);
 
       rawFrames = [];
       riffNotes = [];
@@ -506,9 +523,9 @@ window.addEventListener("DOMContentLoaded", () => {
         const amp = averageAbs(buffer);
 
         rawFrames.push({ time, freq, amp });
-      }, 55);
+      }, jimToggle.checked ? 60 : 55);
 
-      setStatus("Recording… hum away.");
+      setStatus(jimToggle.checked ? "Recording… Jim is listening 🎧" : "Recording… hum away.");
       setMeta("Tap Stop when the riff is done.");
     } catch (err) {
       console.error(err);
@@ -535,7 +552,7 @@ window.addEventListener("DOMContentLoaded", () => {
     refreshButtons(hasNotes);
 
     if (hasNotes) {
-      setStatus("Riff captured. Give it a spin.");
+      setStatus(jimToggle.checked ? "Riff captured. Jim approves." : "Riff captured. Give it a spin.");
     } else {
       setStatus("No clear riff detected.");
       setMeta("Try a cleaner hum with tiny pauses between notes.");
@@ -545,14 +562,14 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   function createBassSynth() {
-    const filter = new Tone.Filter(1600, "lowpass").toDestination();
+    const filter = new Tone.Filter(jimToggle.checked ? 1400 : 1600, "lowpass").toDestination();
     const comp = new Tone.Compressor({
       threshold: -20,
-      ratio: 3,
+      ratio: jimToggle.checked ? 4 : 3,
       attack: 0.01,
       release: 0.2
     }).connect(filter);
-    const gain = new Tone.Gain(0.9).connect(comp);
+    const gain = new Tone.Gain(jimToggle.checked ? 1.0 : 0.9).connect(comp);
 
     let synth;
 
@@ -621,6 +638,7 @@ window.addEventListener("DOMContentLoaded", () => {
       Tone.Transport.stop();
       Tone.Transport.cancel();
     }
+    transportItems = [];
   }
 
   async function playRiff(loop = false) {
@@ -633,9 +651,10 @@ window.addEventListener("DOMContentLoaded", () => {
     const total = Math.max(...riffNotes.map(note => note.start + note.duration)) + 0.15;
 
     riffNotes.forEach(note => {
-      Tone.Transport.schedule((time) => {
+      const id = Tone.Transport.schedule((time) => {
         chain.synth.triggerAttackRelease(note.note, note.duration, time, note.velocity);
       }, note.start);
+      transportItems.push(id);
     });
 
     Tone.Transport.start();
@@ -827,6 +846,7 @@ window.addEventListener("DOMContentLoaded", () => {
         correctPitch: snapToggle.checked,
         tightenRhythm: tightToggle.checked,
         octaveShift: Number(octaveShift.value),
+        jimMode: jimToggle.checked,
         keyMode: keyMode.value,
         keyRoot: Number(keyRoot.value),
         keyScale: keyScale.value,
@@ -850,7 +870,7 @@ window.addEventListener("DOMContentLoaded", () => {
     refreshButtons(riffNotes.length > 0);
 
     if (riffNotes.length > 0) {
-      setStatus("Riff updated.");
+      setStatus(jimToggle.checked ? "Riff updated. Jim Mode on." : "Riff updated.");
     }
 
     updateDetectedKeyText();
@@ -881,8 +901,11 @@ window.addEventListener("DOMContentLoaded", () => {
   wavBtn.addEventListener("click", exportWAV);
   jsonBtn.addEventListener("click", exportJSON);
 
-  [snapToggle, tightToggle, octaveShift, keyMode, keyRoot, keyScale].forEach(el => {
+  [snapToggle, tightToggle, octaveShift, jimToggle, keyMode, keyRoot, keyScale].forEach(el => {
     el.addEventListener("change", () => {
+      if (el === jimToggle) {
+        setStatus(jimToggle.checked ? "Jim Mode activated 🎧" : "Standard capture");
+      }
       updateDetectedKeyText();
       refreshFromSettings();
     });
