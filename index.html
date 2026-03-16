@@ -6,29 +6,34 @@
     name="viewport"
     content="width=device-width, initial-scale=1, viewport-fit=cover"
   />
-  <title>Hum → Bass</title>
+  <title>Hum to Bass</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://unpkg.com/tone@15.5.0/build/Tone.js"></script>
 </head>
 <body>
-  <div class="app-shell">
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="bg-orb orb-3"></div>
+
+  <main class="app">
     <header class="hero">
-      <div class="pill">Riff capture toy</div>
-      <h1>Hum → Bass</h1>
-      <p class="subtitle">
-        Hum a riff. Clean it up if you like. Hear it back as bass. Export it.
+      <div class="hero-badge">🎸 Riff Capture Toy</div>
+      <h1>Hum to Bass</h1>
+      <p>
+        Hum your riff. Clean it up if you like. Hear it back as bass.
+        Export it. Become mysteriously successful.
       </p>
     </header>
 
-    <main class="card">
-      <section class="top-actions">
-        <button id="recordBtn" class="btn btn-record">🎙 Record</button>
-        <button id="stopBtn" class="btn" disabled>■ Stop</button>
-        <button id="playBtn" class="btn" disabled>▶ Play</button>
-        <button id="loopBtn" class="btn" disabled>🔁 Loop Off</button>
-      </section>
+    <section class="panel">
+      <div class="button-row">
+        <button id="recordBtn" type="button" class="btn btn-record">🎙 Record</button>
+        <button id="stopBtn" type="button" class="btn" disabled>■ Stop</button>
+        <button id="playBtn" type="button" class="btn" disabled>▶ Play</button>
+        <button id="loopBtn" type="button" class="btn" disabled>🔁 Loop Off</button>
+      </div>
 
-      <section class="controls">
+      <div class="control-grid">
         <label class="control">
           <span>Sound</span>
           <select id="soundSelect">
@@ -38,14 +43,14 @@
           </select>
         </label>
 
-        <label class="control control-toggle">
+        <label class="control switch">
           <span>Correct pitch</span>
-          <input type="checkbox" id="snapToggle" checked />
+          <input id="snapToggle" type="checkbox" checked />
         </label>
 
-        <label class="control control-toggle">
+        <label class="control switch">
           <span>Tighten rhythm</span>
-          <input type="checkbox" id="tightToggle" checked />
+          <input id="tightToggle" type="checkbox" checked />
         </label>
 
         <label class="control">
@@ -56,9 +61,9 @@
             <option value="12">Up 1</option>
           </select>
         </label>
-      </section>
+      </div>
 
-      <section class="controls key-controls">
+      <div class="control-grid">
         <label class="control">
           <span>Key mode</span>
           <select id="keyMode">
@@ -94,36 +99,40 @@
           </select>
         </label>
 
-        <div class="control key-readout">
+        <div class="control readonly">
           <span>Detected key</span>
-          <div id="detectedKeyText" class="key-text">None yet</div>
+          <div id="detectedKeyText" class="readonly-box">None yet</div>
         </div>
-      </section>
+      </div>
 
-      <section class="meter-wrap">
+      <div class="wave-wrap">
         <canvas id="waveCanvas" width="1200" height="260"></canvas>
         <div class="status-row">
           <div id="status">Ready.</div>
           <div id="meta">No riff captured yet.</div>
         </div>
-      </section>
+      </div>
 
-      <section class="notes-panel">
-        <h2>Detected riff</h2>
-        <div id="noteList" class="note-list">Nothing yet.</div>
-      </section>
+      <div class="results-grid">
+        <section class="results-box">
+          <h2>Detected riff</h2>
+          <div id="noteList" class="note-list">Nothing yet.</div>
+        </section>
 
-      <section class="export-panel">
-        <button id="midiBtn" class="btn" disabled>Export MIDI</button>
-        <button id="wavBtn" class="btn" disabled>Export WAV</button>
-        <button id="jsonBtn" class="btn" disabled>Save Riff Data</button>
-      </section>
-
-      <p class="footnote">
-        Best results: clear humming, one main note at a time, quiet room. Slides are fine — key-aware cleanup helps tame them.
-      </p>
-    </main>
-  </div>
+        <section class="results-box">
+          <h2>Export</h2>
+          <div class="export-row">
+            <button id="midiBtn" type="button" class="btn" disabled>Export MIDI</button>
+            <button id="wavBtn" type="button" class="btn" disabled>Export WAV</button>
+            <button id="jsonBtn" type="button" class="btn" disabled>Save Riff Data</button>
+          </div>
+          <p class="tiny">
+            Best results: hum one main note at a time, even if you slide between notes.
+          </p>
+        </section>
+      </div>
+    </section>
+  </main>
 
   <script src="script.js"></script>
 </body>
