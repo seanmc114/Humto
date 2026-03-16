@@ -28,9 +28,9 @@
     <section class="panel">
       <div class="button-row">
         <button id="recordBtn" type="button" class="btn btn-record">🎙 Record</button>
-        <button id="stopBtn" type="button" class="btn" disabled>■ Stop</button>
-        <button id="playBtn" type="button" class="btn" disabled>▶ Play</button>
-        <button id="loopBtn" type="button" class="btn" disabled>🔁 Loop Off</button>
+        <button id="stopBtn" type="button" class="btn btn-stop" disabled>■ Stop</button>
+        <button id="playBtn" type="button" class="btn btn-play" disabled>▶ Play</button>
+        <button id="loopBtn" type="button" class="btn btn-loop" disabled>🔁 Loop Off</button>
       </div>
 
       <div class="control-grid">
@@ -64,6 +64,11 @@
       </div>
 
       <div class="control-grid">
+        <label class="control switch">
+          <span>Jim Mode 🎧</span>
+          <input id="jimToggle" type="checkbox" checked />
+        </label>
+
         <label class="control">
           <span>Key mode</span>
           <select id="keyMode">
@@ -98,7 +103,9 @@
             <option value="minor" selected>Minor</option>
           </select>
         </label>
+      </div>
 
+      <div class="control-grid single-row">
         <div class="control readonly">
           <span>Detected key</span>
           <div id="detectedKeyText" class="readonly-box">None yet</div>
@@ -122,12 +129,12 @@
         <section class="results-box">
           <h2>Export</h2>
           <div class="export-row">
-            <button id="midiBtn" type="button" class="btn" disabled>Export MIDI</button>
-            <button id="wavBtn" type="button" class="btn" disabled>Export WAV</button>
-            <button id="jsonBtn" type="button" class="btn" disabled>Save Riff Data</button>
+            <button id="midiBtn" type="button" class="btn btn-midi" disabled>Export MIDI</button>
+            <button id="wavBtn" type="button" class="btn btn-wav" disabled>Export WAV</button>
+            <button id="jsonBtn" type="button" class="btn btn-json" disabled>Save Riff Data</button>
           </div>
           <p class="tiny">
-            Best results: hum one main note at a time, even if you slide between notes.
+            Jim Mode gives cleaner note capture, stronger smoothing, and better handling of slides.
           </p>
         </section>
       </div>
