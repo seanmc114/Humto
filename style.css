@@ -14,9 +14,9 @@
   --mint: #34d399;
   --blue: #60a5fa;
   --violet: #9b7bff;
+  --gold: #ffd166;
 
   --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
-  --radius: 24px;
 }
 
 * {
@@ -175,33 +175,14 @@ body {
   cursor: not-allowed;
 }
 
-.btn-record {
-  background: linear-gradient(135deg, #ff4da6, #ff8a3c);
-}
-
-.btn-stop {
-  background: linear-gradient(135deg, #ff5b5b, #d93636);
-}
-
-.btn-play {
-  background: linear-gradient(135deg, #34d399, #10b981);
-}
-
-.btn-loop {
-  background: linear-gradient(135deg, #60a5fa, #3b82f6);
-}
-
-.btn-midi {
-  background: linear-gradient(135deg, #9b7bff, #6b4cff);
-}
-
-.btn-wav {
-  background: linear-gradient(135deg, #ff9f4a, #ff7a18);
-}
-
-.btn-json {
-  background: linear-gradient(135deg, #34d399, #059669);
-}
+.btn-record { background: linear-gradient(135deg, #ff4da6, #ff8a3c); }
+.btn-stop { background: linear-gradient(135deg, #ff5b5b, #d93636); }
+.btn-play { background: linear-gradient(135deg, #34d399, #10b981); }
+.btn-loop { background: linear-gradient(135deg, #60a5fa, #3b82f6); }
+.btn-midi { background: linear-gradient(135deg, #9b7bff, #6b4cff); }
+.btn-wav { background: linear-gradient(135deg, #ff9f4a, #ff7a18); }
+.btn-json { background: linear-gradient(135deg, #34d399, #059669); }
+.btn-perf { background: linear-gradient(135deg, #ffd166, #f59e0b); color: #1f2937; }
 
 .control {
   display: flex;
