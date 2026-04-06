@@ -6,6 +6,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const midiBtn = document.getElementById("midiBtn");
   const wavBtn = document.getElementById("wavBtn");
   const jsonBtn = document.getElementById("jsonBtn");
+  const perfBtn = document.getElementById("perfBtn");
 
   const soundSelect = document.getElementById("soundSelect");
   const snapToggle = document.getElementById("snapToggle");
@@ -33,8 +34,12 @@ window.addEventListener("DOMContentLoaded", () => {
   let analyser = null;
   let mediaStream = null;
   let sourceNode = null;
+  let inputHighpass = null;
+  let inputLowpass = null;
+
   let captureTimer = null;
   let drawHandle = null;
+  let loopTimeout = null;
 
   let isRecording = false;
   let isLooping = false;
@@ -42,8 +47,6 @@ window.addEventListener("DOMContentLoaded", () => {
   let riffNotes = [];
   let liveWave = new Float32Array(2048);
   let detectedKey = null;
-  let loopTimeout = null;
-  let transportItems = [];
 
   function setStatus(text) {
     statusEl.textContent = text;
@@ -126,21 +129,21 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function clampBassRange(midi) {
     let value = midi;
-    while (value > 52) value -= 12;
+    while (value > 64) value -= 12;
     while (value < 28) value += 12;
     return value;
   }
 
   function autoCorrelate(buffer, sampleRate) {
     const level = rms(buffer);
-    const minLevel = jimToggle.checked ? 0.02 : 0.015;
+    const minLevel = jimToggle.checked ? 0.022 : 0.018;
     if (level < minLevel) return null;
 
     let bestOffset = -1;
     let bestCorrelation = 0;
 
-    const minFreq = 55;
-    const maxFreq = 650;
+    const minFreq = 60;
+    const maxFreq = 800;
     const minOffset = Math.floor(sampleRate / maxFreq);
     const maxOffset = Math.floor(sampleRate / minFreq);
 
@@ -157,7 +160,7 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    const minCorrelation = jimToggle.checked ? 0.9 : 0.87;
+    const minCorrelation = jimToggle.checked ? 0.935 : 0.915;
     if (bestCorrelation > minCorrelation && bestOffset > 0) {
       return sampleRate / bestOffset;
     }
@@ -223,10 +226,16 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     if (sourceNode) {
-      try {
-        sourceNode.disconnect();
-      } catch (e) {}
+      try { sourceNode.disconnect(); } catch (e) {}
       sourceNode = null;
+    }
+    if (inputHighpass) {
+      try { inputHighpass.disconnect(); } catch (e) {}
+      inputHighpass = null;
+    }
+    if (inputLowpass) {
+      try { inputLowpass.disconnect(); } catch (e) {}
+      inputLowpass = null;
     }
 
     analyser = null;
@@ -326,8 +335,8 @@ window.addEventListener("DOMContentLoaded", () => {
       };
     });
 
+    const smoothing = jimToggle.checked ? 6 : 4;
     const smoothed = [];
-    const smoothing = jimToggle.checked ? 4 : 2;
 
     for (let i = 0; i < voiced.length; i++) {
       const slice = voiced
@@ -363,12 +372,11 @@ window.addEventListener("DOMContentLoaded", () => {
 
       silenceFrames = 0;
 
-      let midiValue;
-      if (snapToggle.checked) {
-        midiValue = activeKey
-          ? nearestMidiInScale(frame.midiFloat, activeKey.root, activeKey.scale)
-          : Math.round(frame.midiFloat);
-      } else {
+      let midiValue = Math.round(frame.midiFloat);
+
+      if (snapToggle.checked && activeKey) {
+        midiValue = nearestMidiInScale(frame.midiFloat, activeKey.root, activeKey.scale);
+      } else if (snapToggle.checked) {
         midiValue = Math.round(frame.midiFloat);
       }
 
@@ -382,7 +390,7 @@ window.addEventListener("DOMContentLoaded", () => {
       }
 
       const currentMedian = median(current.values);
-      const tolerance = jimToggle.checked ? 2.0 : (snapToggle.checked ? 1.2 : 1.8);
+      const tolerance = jimToggle.checked ? 2.5 : 2.0;
 
       if (Math.abs(midiValue - currentMedian) <= tolerance) {
         current.end = frame.time + 0.06;
@@ -410,16 +418,16 @@ window.addEventListener("DOMContentLoaded", () => {
 
         return {
           start: group.start,
-          duration: Math.max(jimToggle.checked ? 0.12 : 0.08, group.end - group.start),
+          duration: Math.max(jimToggle.checked ? 0.15 : 0.12, group.end - group.start),
           midi: clampBassRange(finalMidi)
         };
       })
-      .filter(note => note.duration >= (jimToggle.checked ? 0.12 : 0.1));
+      .filter(note => note.duration >= (jimToggle.checked ? 0.15 : 0.12));
 
     if (!cleaned.length) return [];
 
     if (tightToggle.checked) {
-      const shortest = Math.max(jimToggle.checked ? 0.14 : 0.12, Math.min(...cleaned.map(n => n.duration)));
+      const shortest = Math.max(jimToggle.checked ? 0.16 : 0.14, Math.min(...cleaned.map(n => n.duration)));
       const grid = shortest < 0.18 ? 0.125 : 0.25;
 
       cleaned = cleaned.map(note => {
@@ -441,7 +449,7 @@ window.addEventListener("DOMContentLoaded", () => {
     return cleaned.map(note => ({
       ...note,
       note: noteNameFromMidi(note.midi),
-      velocity: 0.92
+      velocity: 0.9
     }));
   }
 
@@ -451,6 +459,7 @@ window.addEventListener("DOMContentLoaded", () => {
     midiBtn.disabled = !hasNotes;
     wavBtn.disabled = !hasNotes;
     jsonBtn.disabled = !hasNotes;
+    perfBtn.disabled = !hasNotes;
   }
 
   async function startRecording() {
@@ -479,21 +488,21 @@ window.addEventListener("DOMContentLoaded", () => {
 
       analyser = audioContext.createAnalyser();
       analyser.fftSize = 2048;
-      analyser.smoothingTimeConstant = jimToggle.checked ? 0.9 : 0.82;
+      analyser.smoothingTimeConstant = jimToggle.checked ? 0.93 : 0.88;
 
       sourceNode = audioContext.createMediaStreamSource(mediaStream);
 
-      const highpass = audioContext.createBiquadFilter();
-      highpass.type = "highpass";
-      highpass.frequency.value = jimToggle.checked ? 70 : 50;
+      inputHighpass = audioContext.createBiquadFilter();
+      inputHighpass.type = "highpass";
+      inputHighpass.frequency.value = jimToggle.checked ? 95 : 80;
 
-      const lowpass = audioContext.createBiquadFilter();
-      lowpass.type = "lowpass";
-      lowpass.frequency.value = jimToggle.checked ? 1200 : 1500;
+      inputLowpass = audioContext.createBiquadFilter();
+      inputLowpass.type = "lowpass";
+      inputLowpass.frequency.value = jimToggle.checked ? 1000 : 1300;
 
-      sourceNode.connect(highpass);
-      highpass.connect(lowpass);
-      lowpass.connect(analyser);
+      sourceNode.connect(inputHighpass);
+      inputHighpass.connect(inputLowpass);
+      inputLowpass.connect(analyser);
 
       rawFrames = [];
       riffNotes = [];
@@ -523,7 +532,7 @@ window.addEventListener("DOMContentLoaded", () => {
         const amp = averageAbs(buffer);
 
         rawFrames.push({ time, freq, amp });
-      }, jimToggle.checked ? 60 : 55);
+      }, jimToggle.checked ? 62 : 58);
 
       setStatus(jimToggle.checked ? "Recording… Jim is listening 🎧" : "Recording… hum away.");
       setMeta("Tap Stop when the riff is done.");
@@ -561,75 +570,130 @@ window.addEventListener("DOMContentLoaded", () => {
     updateDetectedKeyText();
   }
 
-  function createBassSynth() {
-    const filter = new Tone.Filter(jimToggle.checked ? 1400 : 1600, "lowpass").toDestination();
-    const comp = new Tone.Compressor({
-      threshold: -20,
-      ratio: jimToggle.checked ? 4 : 3,
-      attack: 0.01,
-      release: 0.2
-    }).connect(filter);
-    const gain = new Tone.Gain(jimToggle.checked ? 1.0 : 0.9).connect(comp);
+  function createInstrument() {
+    const output = new Tone.Gain(0.95).toDestination();
 
-    let synth;
+    switch (soundSelect.value) {
+      case "picked":
+        return new Tone.MonoSynth({
+          oscillator: { type: "square" },
+          envelope: { attack: 0.003, decay: 0.12, sustain: 0.15, release: 0.12 },
+          filterEnvelope: {
+            attack: 0.001, decay: 0.15, sustain: 0.18, release: 0.14,
+            baseFrequency: 120, octaves: 2.4
+          }
+        }).connect(output);
 
-    if (soundSelect.value === "picked") {
-      synth = new Tone.MonoSynth({
-        oscillator: { type: "square" },
-        envelope: {
-          attack: 0.003,
-          decay: 0.12,
-          sustain: 0.15,
-          release: 0.12
-        },
-        filterEnvelope: {
-          attack: 0.001,
-          decay: 0.15,
-          sustain: 0.18,
-          release: 0.14,
-          baseFrequency: 120,
-          octaves: 2.4
-        }
-      }).connect(gain);
-    } else if (soundSelect.value === "synth") {
-      synth = new Tone.MonoSynth({
-        oscillator: { type: "sawtooth" },
-        envelope: {
-          attack: 0.01,
-          decay: 0.22,
-          sustain: 0.28,
-          release: 0.22
-        },
-        filterEnvelope: {
-          attack: 0.01,
-          decay: 0.2,
-          sustain: 0.3,
-          release: 0.25,
-          baseFrequency: 90,
-          octaves: 2.8
-        }
-      }).connect(gain);
-    } else {
-      synth = new Tone.MonoSynth({
-        oscillator: { type: "triangle" },
-        envelope: {
-          attack: 0.008,
-          decay: 0.18,
-          sustain: 0.42,
-          release: 0.18
-        },
-        filterEnvelope: {
-          attack: 0.005,
-          decay: 0.16,
-          sustain: 0.35,
-          release: 0.2,
-          baseFrequency: 85,
-          octaves: 2.1
-        }
-      }).connect(gain);
+      case "synthbass":
+        return new Tone.MonoSynth({
+          oscillator: { type: "sawtooth" },
+          envelope: { attack: 0.01, decay: 0.22, sustain: 0.28, release: 0.22 },
+          filterEnvelope: {
+            attack: 0.01, decay: 0.2, sustain: 0.3, release: 0.25,
+            baseFrequency: 90, octaves: 2.8
+          }
+        }).connect(output);
+
+      case "lead":
+        return new Tone.Synth({
+          oscillator: { type: "sawtooth" },
+          envelope: { attack: 0.01, decay: 0.08, sustain: 0.35, release: 0.15 }
+        }).connect(output);
+
+      case "pluck":
+        return new Tone.PluckSynth({
+          attackNoise: 1,
+          dampening: 3500,
+          resonance: 0.9
+        }).connect(output);
+
+      case "epiano":
+        return new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: "triangle" },
+          envelope: { attack: 0.01, decay: 0.2, sustain: 0.25, release: 0.45 }
+        }).connect(output);
+
+      case "organ":
+        return new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: "square" },
+          envelope: { attack: 0.01, decay: 0.05, sustain: 0.9, release: 0.2 }
+        }).connect(output);
+
+      case "brass":
+        return new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: "sawtooth" },
+          envelope: { attack: 0.03, decay: 0.12, sustain: 0.5, release: 0.22 }
+        }).connect(output);
+
+      case "strings":
+        return new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: "triangle" },
+          envelope: { attack: 0.08, decay: 0.1, sustain: 0.65, release: 0.5 }
+        }).connect(output);
+
+      case "choir":
+        return new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: "sine" },
+          envelope: { attack: 0.12, decay: 0.1, sustain: 0.7, release: 0.6 }
+        }).connect(output);
+
+      case "flute":
+        return new Tone.Synth({
+          oscillator: { type: "sine" },
+          envelope: { attack: 0.03, decay: 0.08, sustain: 0.5, release: 0.25 }
+        }).connect(output);
+
+      case "softpad":
+        return new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: "triangle" },
+          envelope: { attack: 0.2, decay: 0.1, sustain: 0.75, release: 0.8 }
+        }).connect(output);
+
+      case "bell":
+        return new Tone.MetalSynth({
+          frequency: 300,
+          envelope: { attack: 0.001, decay: 0.8, release: 0.4 },
+          harmonicity: 5.1,
+          modulationIndex: 32,
+          resonance: 2000,
+          octaves: 1.5
+        }).connect(output);
+
+      case "marimba":
+        return new Tone.MembraneSynth({
+          pitchDecay: 0.01,
+          octaves: 2,
+          oscillator: { type: "triangle" },
+          envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 0.2 }
+        }).connect(output);
+
+      case "acid":
+        return new Tone.MonoSynth({
+          oscillator: { type: "sawtooth" },
+          envelope: { attack: 0.005, decay: 0.15, sustain: 0.25, release: 0.12 },
+          filterEnvelope: {
+            attack: 0.001, decay: 0.12, sustain: 0.3, release: 0.08,
+            baseFrequency: 160, octaves: 3.4
+          }
+        }).connect(output);
+
+      case "squarelead":
+        return new Tone.Synth({
+          oscillator: { type: "square" },
+          envelope: { attack: 0.01, decay: 0.07, sustain: 0.4, release: 0.18 }
+        }).connect(output);
+
+      case "warm":
+      default:
+        return new Tone.MonoSynth({
+          oscillator: { type: "triangle" },
+          envelope: { attack: 0.008, decay: 0.18, sustain: 0.42, release: 0.18 },
+          filterEnvelope: {
+            attack: 0.005, decay: 0.16, sustain: 0.35, release: 0.2,
+            baseFrequency: 85, octaves: 2.1
+          }
+        }).connect(output);
     }
-
-    return { synth, filter, comp, gain };
   }
 
   function stopPlayback() {
@@ -638,7 +702,17 @@ window.addEventListener("DOMContentLoaded", () => {
       Tone.Transport.stop();
       Tone.Transport.cancel();
     }
-    transportItems = [];
+  }
+
+  function triggerNote(instrument, noteName, duration, time, velocity) {
+    if (instrument instanceof Tone.PluckSynth || instrument instanceof Tone.MembraneSynth || instrument instanceof Tone.MetalSynth) {
+      instrument.triggerAttackRelease(noteName, duration, time, velocity);
+      return;
+    }
+
+    if (instrument.triggerAttackRelease) {
+      instrument.triggerAttackRelease(noteName, duration, time, velocity);
+    }
   }
 
   async function playRiff(loop = false) {
@@ -647,14 +721,13 @@ window.addEventListener("DOMContentLoaded", () => {
     await Tone.start();
     stopPlayback();
 
-    const chain = createBassSynth();
-    const total = Math.max(...riffNotes.map(note => note.start + note.duration)) + 0.15;
+    const instrument = createInstrument();
+    const total = Math.max(...riffNotes.map(note => note.start + note.duration)) + 0.2;
 
     riffNotes.forEach(note => {
-      const id = Tone.Transport.schedule((time) => {
-        chain.synth.triggerAttackRelease(note.note, note.duration, time, note.velocity);
+      Tone.Transport.schedule((time) => {
+        triggerNote(instrument, note.note, note.duration, time, note.velocity);
       }, note.start);
-      transportItems.push(id);
     });
 
     Tone.Transport.start();
@@ -729,10 +802,10 @@ window.addEventListener("DOMContentLoaded", () => {
     downloadBlob(new Blob([bytes], { type: "audio/midi" }), "hum-to-bass.mid");
   }
 
-  function renderBassWavPCM(sampleRate = 44100) {
+  function renderPatchPCM(sampleRate = 44100) {
     if (!riffNotes.length) return null;
 
-    const total = Math.max(...riffNotes.map(n => n.start + n.duration)) + 0.4;
+    const total = Math.max(...riffNotes.map(n => n.start + n.duration)) + 0.5;
     const length = Math.ceil(total * sampleRate);
     const data = new Float32Array(length);
 
@@ -746,34 +819,118 @@ window.addEventListener("DOMContentLoaded", () => {
         if (idx >= length) break;
 
         const t = i / sampleRate;
-        const attack = Math.min(1, i / (sampleRate * 0.008));
-        const release = Math.min(1, (durationSamples - i) / (sampleRate * 0.05));
+        const attack = Math.min(1, i / (sampleRate * 0.01));
+        const release = Math.min(1, (durationSamples - i) / (sampleRate * 0.06));
         const env = Math.max(0, Math.min(attack, release));
 
-        let sample;
-        if (soundSelect.value === "picked") {
-          sample =
-            Math.sign(Math.sin(2 * Math.PI * freq * t)) * 0.46 +
-            Math.sin(2 * Math.PI * freq * 2 * t) * 0.10 +
-            Math.sin(2 * Math.PI * freq * 3 * t) * 0.06;
-        } else if (soundSelect.value === "synth") {
-          sample =
-            (2 * ((freq * t) % 1) - 1) * 0.55 +
-            Math.sin(2 * Math.PI * freq * 0.5 * t) * 0.14;
-        } else {
-          sample =
-            Math.sin(2 * Math.PI * freq * t) * 0.72 +
-            Math.sin(2 * Math.PI * freq * 2 * t) * 0.16 +
-            Math.sin(2 * Math.PI * freq * 3 * t) * 0.05;
+        let sample = 0;
+
+        switch (soundSelect.value) {
+          case "picked":
+            sample =
+              Math.sign(Math.sin(2 * Math.PI * freq * t)) * 0.44 +
+              Math.sin(2 * Math.PI * freq * 2 * t) * 0.10 +
+              Math.sin(2 * Math.PI * freq * 3 * t) * 0.05;
+            break;
+          case "synthbass":
+            sample =
+              (2 * ((freq * t) % 1) - 1) * 0.52 +
+              Math.sin(2 * Math.PI * freq * 0.5 * t) * 0.12;
+            break;
+          case "lead":
+            sample =
+              Math.sin(2 * Math.PI * freq * t) * 0.55 +
+              (2 * ((freq * t) % 1) - 1) * 0.18;
+            break;
+          case "pluck":
+            sample =
+              Math.sin(2 * Math.PI * freq * t) * 0.55 +
+              Math.sin(2 * Math.PI * freq * 2 * t) * 0.08;
+            sample *= Math.exp(-t * 10);
+            break;
+          case "epiano":
+            sample =
+              Math.sin(2 * Math.PI * freq * t) * 0.50 +
+              Math.sin(2 * Math.PI * freq * 2 * t) * 0.18 +
+              Math.sin(2 * Math.PI * freq * 3 * t) * 0.06;
+            break;
+          case "organ":
+            sample =
+              Math.sin(2 * Math.PI * freq * t) * 0.42 +
+              Math.sin(2 * Math.PI * freq * 2 * t) * 0.24 +
+              Math.sin(2 * Math.PI * freq * 4 * t) * 0.12;
+            break;
+          case "brass":
+            sample =
+              (2 * ((freq * t) % 1) - 1) * 0.36 +
+              Math.sin(2 * Math.PI * freq * t) * 0.26;
+            break;
+          case "strings":
+            sample =
+              Math.sin(2 * Math.PI * freq * t) * 0.48 +
+              Math.sin(2 * Math.PI * freq * 2 * t) * 0.16;
+            break;
+          case "choir":
+            sample =
+              Math.sin(2 * Math.PI * freq * t) * 0.48 +
+              Math.sin(2 * Math.PI * freq * 2 * t) * 0.05 +
+              Math.sin(2 * Math.PI * freq * 3 * t) * 0.03;
+            break;
+          case "flute":
+            sample =
+              Math.sin(2 * Math.PI * freq * t) * 0.58 +
+              Math.sin(2 * Math.PI * freq * 2 * t) * 0.04;
+            break;
+          case "softpad":
+            sample =
+              Math.sin(2 * Math.PI * freq * t) * 0.45 +
+              Math.sin(2 * Math.PI * freq * 0.5 * t) * 0.18;
+            break;
+          case "bell":
+            sample =
+              Math.sin(2 * Math.PI * freq * t) * 0.35 +
+              Math.sin(2 * Math.PI * freq * 2.7 * t) * 0.20 +
+              Math.sin(2 * Math.PI * freq * 5.4 * t) * 0.12;
+            break;
+          case "marimba":
+            sample =
+              Math.sin(2 * Math.PI * freq * t) * 0.50 +
+              Math.sin(2 * Math.PI * freq * 3 * t) * 0.10;
+            sample *= Math.exp(-t * 7);
+            break;
+          case "acid":
+            sample =
+              (2 * ((freq * t) % 1) - 1) * 0.45 +
+              Math.sin(2 * Math.PI * freq * t) * 0.16;
+            break;
+          case "squarelead":
+            sample =
+              Math.sign(Math.sin(2 * Math.PI * freq * t)) * 0.50 +
+              Math.sin(2 * Math.PI * freq * 2 * t) * 0.08;
+            break;
+          case "warm":
+          default:
+            sample =
+              Math.sin(2 * Math.PI * freq * t) * 0.68 +
+              Math.sin(2 * Math.PI * freq * 2 * t) * 0.14 +
+              Math.sin(2 * Math.PI * freq * 3 * t) * 0.04;
+            break;
         }
 
-        const pluck = Math.exp(-t * 28) * (Math.random() * 2 - 1) * 0.03;
-        data[idx] += (sample + pluck) * env * 0.33;
+        const breath = (soundSelect.value === "choir" || soundSelect.value === "flute")
+          ? Math.sin(2 * Math.PI * 5 * t) * 0.01
+          : 0;
+
+        const pluck = (soundSelect.value === "warm" || soundSelect.value === "picked" || soundSelect.value === "synthbass")
+          ? Math.exp(-t * 28) * (Math.random() * 2 - 1) * 0.025
+          : 0;
+
+        data[idx] += (sample + breath + pluck) * env * 0.34;
       }
     }
 
     for (let i = 1; i < data.length; i++) {
-      data[i] = data[i] + data[i - 1] * 0.28;
+      data[i] = data[i] + data[i - 1] * 0.25;
     }
 
     return { sampleRate, data };
@@ -813,7 +970,7 @@ window.addEventListener("DOMContentLoaded", () => {
     writeString(12, "fmt ");
     view.setUint32(16, 16, true);
     view.setUint16(20, 1, true);
-    view.setUint16(22, numChannels, true);
+    view.setUint16(22, 1, true);
     view.setUint32(24, sampleRate, true);
     view.setUint32(28, byteRate, true);
     view.setUint16(32, blockAlign, true);
@@ -830,10 +987,62 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   function exportWAV() {
-    const rendered = renderBassWavPCM();
+    const rendered = renderPatchPCM();
     if (!rendered) return;
     const wav = encodeWav(rendered.data, rendered.sampleRate);
     downloadBlob(wav, "hum-to-bass.wav");
+  }
+
+  async function exportPerformance() {
+    if (!riffNotes.length) return;
+
+    try {
+      await Tone.start();
+      stopPlayback();
+
+      const total = Math.max(...riffNotes.map(note => note.start + note.duration)) + 0.3;
+      const dest = Tone.getContext().createMediaStreamDestination();
+      const recorder = new MediaRecorder(dest.stream);
+
+      const chunks = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+        downloadBlob(blob, "hum-to-bass-performance.webm");
+      };
+
+      const instrument = createInstrument();
+      if (instrument.connect) {
+        const tapGain = new Tone.Gain(1);
+        instrument.connect(tapGain);
+        tapGain.connect(dest);
+      }
+
+      recorder.start();
+
+      riffNotes.forEach(note => {
+        Tone.Transport.schedule((time) => {
+          triggerNote(instrument, note.note, note.duration, time, note.velocity);
+        }, note.start);
+      });
+
+      Tone.Transport.start();
+      setStatus("Recording performance export…");
+
+      setTimeout(() => {
+        Tone.Transport.stop();
+        Tone.Transport.cancel();
+        recorder.stop();
+        setStatus("Performance export finished.");
+      }, total * 1000);
+    } catch (err) {
+      console.error(err);
+      setStatus("Performance export failed.");
+      setMeta("Your browser may not support recording the rendered output.");
+    }
   }
 
   function exportJSON() {
@@ -842,7 +1051,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const payload = {
       createdAt: new Date().toISOString(),
       settings: {
-        sound: soundSelect.value,
+        instrument: soundSelect.value,
         correctPitch: snapToggle.checked,
         tightenRhythm: tightToggle.checked,
         octaveShift: Number(octaveShift.value),
@@ -900,6 +1109,7 @@ window.addEventListener("DOMContentLoaded", () => {
   midiBtn.addEventListener("click", exportMIDI);
   wavBtn.addEventListener("click", exportWAV);
   jsonBtn.addEventListener("click", exportJSON);
+  perfBtn.addEventListener("click", exportPerformance);
 
   [snapToggle, tightToggle, octaveShift, jimToggle, keyMode, keyRoot, keyScale].forEach(el => {
     el.addEventListener("change", () => {
@@ -912,7 +1122,7 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   soundSelect.addEventListener("change", () => {
-    if (riffNotes.length) setStatus("Sound changed.");
+    if (riffNotes.length) setStatus("Instrument changed.");
   });
 
   window.addEventListener("beforeunload", () => {
