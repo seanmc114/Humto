@@ -6,7 +6,7 @@
     name="viewport"
     content="width=device-width, initial-scale=1, viewport-fit=cover"
   />
-  <title>Hum to Bass</title>
+  <title>HumTo</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://unpkg.com/tone@15.5.0/build/Tone.js"></script>
 </head>
@@ -20,7 +20,7 @@
       <div class="hero-badge">🎸 Riff Capture Toy</div>
       <h1>Hum to Bass</h1>
       <p>
-        Hum your riff. Clean it up if you like. Hear it back as bass.
+        Hum your riff. Clean it up. Hear it back with different instruments.
         Export it. Become mysteriously successful.
       </p>
     </header>
@@ -35,11 +35,24 @@
 
       <div class="control-grid">
         <label class="control">
-          <span>Sound</span>
+          <span>Instrument</span>
           <select id="soundSelect">
             <option value="warm">Warm Bass</option>
             <option value="picked">Picked Bass</option>
-            <option value="synth">Synth Bass</option>
+            <option value="synthbass">Synth Bass</option>
+            <option value="lead">Lead Synth</option>
+            <option value="pluck">Pluck</option>
+            <option value="epiano">Electric Piano</option>
+            <option value="organ">Organ</option>
+            <option value="brass">Brass</option>
+            <option value="strings">Strings</option>
+            <option value="choir">Choir</option>
+            <option value="flute">Flute</option>
+            <option value="softpad">Soft Pad</option>
+            <option value="bell">Bell</option>
+            <option value="marimba">Marimba</option>
+            <option value="acid">Acid Lead</option>
+            <option value="squarelead">Square Lead</option>
           </select>
         </label>
 
@@ -66,7 +79,7 @@
       <div class="control-grid">
         <label class="control switch">
           <span>Jim Mode 🎧</span>
-          <input id="jimToggle" type="checkbox" checked />
+          <input id="jimToggle" type="checkbox" />
         </label>
 
         <label class="control">
@@ -132,9 +145,10 @@
             <button id="midiBtn" type="button" class="btn btn-midi" disabled>Export MIDI</button>
             <button id="wavBtn" type="button" class="btn btn-wav" disabled>Export WAV</button>
             <button id="jsonBtn" type="button" class="btn btn-json" disabled>Save Riff Data</button>
+            <button id="perfBtn" type="button" class="btn btn-perf" disabled>Export Performance</button>
           </div>
           <p class="tiny">
-            Jim Mode gives cleaner note capture, stronger smoothing, and better handling of slides.
+            Best reliability: WAV + MIDI. “Export Performance” records the rendered playback and usually saves as WEBM audio.
           </p>
         </section>
       </div>
